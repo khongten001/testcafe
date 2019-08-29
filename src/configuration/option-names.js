@@ -26,5 +26,14 @@ export default {
     pageLoadTimeout:        'pageLoadTimeout',
     videoPath:              'videoPath',
     videoOptions:           'videoOptions',
-    videoEncodingOptions:   'videoEncodingOptions'
+    videoEncodingOptions:   'videoEncodingOptions',
+    tsConfigPath:           'tsConfigPath',
+    clientScripts:          'clientScripts',
+    requestHooks:           'requestHooks',
+    retryTestPages:         'retryTestPages',
+    hostname:               'hostname',
+    port1:                  'port1',
+    port2:                  'port2',
+    developmentMode:        'developmentMode',
+    disablePageCaching:     'disablePageCaching'
 };

@@ -11,6 +11,15 @@ import {
     getTimeLimitedPromise,
     browser
 } from './deps/testcafe-core';
+
+import {
+    CHECK_IFRAME_DRIVER_LINK_DELAY,
+    SEND_STATUS_REQUEST_TIME_LIMIT,
+    SEND_STATUS_REQUEST_RETRY_DELAY,
+    SEND_STATUS_REQUEST_RETRY_COUNT,
+    CHECK_STATUS_RETRY_DELAY
+} from '../../utils/browser-connection-timeouts';
+
 import { StatusBar } from './deps/testcafe-ui';
 
 import TEST_RUN_MESSAGES from '../../test-run/client-messages';
@@ -30,7 +39,9 @@ import {
     CurrentIframeIsNotLoadedError,
     CurrentIframeNotFoundError,
     CurrentIframeIsInvisibleError,
-    CannotObtainInfoForElementSpecifiedBySelectorError
+    CannotObtainInfoForElementSpecifiedBySelectorError,
+    UncaughtErrorInCustomClientScriptCode,
+    UncaughtErrorInCustomClientScriptLoadedFromModule
 } from '../../errors/test-run';
 
 import BrowserConsoleMessages from '../../test-run/browser-console-messages';
@@ -68,11 +79,6 @@ const TEST_SPEED                           = 'testcafe|driver|test-speed';
 const ASSERTION_RETRIES_TIMEOUT            = 'testcafe|driver|assertion-retries-timeout';
 const ASSERTION_RETRIES_START_TIME         = 'testcafe|driver|assertion-retries-start-time';
 const CONSOLE_MESSAGES                     = 'testcafe|driver|console-messages';
-const CHECK_IFRAME_DRIVER_LINK_DELAY       = 500;
-const SEND_STATUS_REQUEST_TIME_LIMIT       = 5000;
-const SEND_STATUS_REQUEST_RETRY_DELAY      = 300;
-const SEND_STATUS_REQUEST_RETRY_COUNT      = 5;
-const CHECK_STATUS_RETRY_DELAY             = 1000;
 
 const ACTION_IFRAME_ERROR_CTORS = {
     NotLoadedError:   ActionIframeIsNotLoadedError,
@@ -132,6 +138,7 @@ export default class Driver {
         hammerhead.on(hammerhead.EVENTS.uncaughtJsError, err => this._onJsError(err));
         hammerhead.on(hammerhead.EVENTS.unhandledRejection, err => this._onJsError(err));
         hammerhead.on(hammerhead.EVENTS.consoleMethCalled, e => this._onConsoleMessage(e));
+        hammerhead.on(hammerhead.EVENTS.beforeFormSubmit, e => this._onFormSubmit(e));
 
         this.setCustomCommandHandlers(COMMAND_TYPE.unlockPage, () => this._unlockPageAfterTestIsDone());
     }
@@ -188,6 +195,23 @@ export default class Driver {
         }
 
         return false;
+    }
+
+    onCustomClientScriptError (err, moduleName) {
+        const error = moduleName
+            ? new UncaughtErrorInCustomClientScriptLoadedFromModule(err, moduleName)
+            : new UncaughtErrorInCustomClientScriptCode(err);
+
+        if (!this.contextStorage.getItem(PENDING_PAGE_ERROR))
+            this.contextStorage.setItem(PENDING_PAGE_ERROR, error);
+    }
+
+    // HACK: For https://github.com/DevExpress/testcafe/issues/3560
+    // We have to cancel every form submit after a test is done
+    // to prevent requests to a closed session
+    _onFormSubmit (e) {
+        if (this.contextStorage.getItem(TEST_DONE_SENT_FLAG))
+            e.preventSubmit = true;
     }
 
     // Console messages

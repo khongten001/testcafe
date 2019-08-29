@@ -1,5 +1,4 @@
 const path                = require('path');
-const Promise             = require('pinkie');
 const expect              = require('chai').expect;
 const config              = require('../../../config');
 const browserProviderPool = require('../../../../../lib/browser/provider/pool');
@@ -50,8 +49,7 @@ function run (pathToTest, filter) {
         });
 }
 
-// NOTE: don't work on TravisCI, fix it ASAP
-describe.skip('Browser reconnect', function () {
+describe('Browser reconnect', function () {
     if (config.useLocalBrowsers) {
         it('Should restart browser when it does not respond', function () {
             return run('./testcafe-fixtures/index-test.js', 'Should restart browser when it does not respond', { only: 'chrome' })

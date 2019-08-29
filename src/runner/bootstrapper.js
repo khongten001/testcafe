@@ -1,5 +1,4 @@
 import { isUndefined, filter, flatten, chunk, times } from 'lodash';
-import Promise from 'pinkie';
 import Compiler from '../compiler';
 import BrowserConnection from '../browser/connection';
 import { GeneralError } from '../errors/runtime';
@@ -12,18 +11,21 @@ import path from 'path';
 import fs from 'fs';
 import makeDir from 'make-dir';
 import resolvePathRelativelyCwd from '../utils/resolve-path-relatively-cwd';
+import loadClientScripts from '../custom-client-scripts/load';
+import { setUniqueUrls } from '../custom-client-scripts/utils';
 
 export default class Bootstrapper {
     constructor (browserConnectionGateway) {
         this.browserConnectionGateway = browserConnectionGateway;
-
-        this.concurrency                 = null;
-        this.sources                     = [];
-        this.browsers                    = [];
-        this.reporters                   = [];
-        this.filter                      = null;
-        this.appCommand                  = null;
-        this.appInitDelay                = null;
+        this.concurrency              = null;
+        this.sources                  = [];
+        this.browsers                 = [];
+        this.reporters                = [];
+        this.filter                   = null;
+        this.appCommand               = null;
+        this.appInitDelay             = null;
+        this.tsConfigPath             = null;
+        this.clientScripts            = [];
     }
 
     static _splitBrowserInfo (browserInfo) {
@@ -74,9 +76,10 @@ export default class Bootstrapper {
         if (!this.sources.length)
             throw new GeneralError(RUNTIME_ERRORS.testSourcesNotSet);
 
-        const parsedFileList = await parseFileList(this.sources, process.cwd());
-        const compiler       = new Compiler(parsedFileList);
-        let tests            = await compiler.getTests();
+        const { parsedFileList, compilerOptions } = await this._getCompilerArguments();
+
+        const compiler = new Compiler(parsedFileList, compilerOptions);
+        let tests      = await compiler.getTests();
 
         const testsWithOnlyFlag = tests.filter(test => test.only);
 
@@ -90,6 +93,18 @@ export default class Bootstrapper {
             throw new GeneralError(RUNTIME_ERRORS.noTestsToRun);
 
         return tests;
+    }
+
+    async _getCompilerArguments () {
+        const parsedFileList = await parseFileList(this.sources, process.cwd());
+
+        const compilerOptions = {
+            typeScriptOptions: {
+                tsConfigPath: this.tsConfigPath
+            }
+        };
+
+        return { parsedFileList, compilerOptions };
     }
 
     async _ensureOutStream (outStream) {
@@ -121,20 +136,26 @@ export default class Bootstrapper {
 
         return Promise.all(this.reporters.map(async ({ name, output }) => {
             let pluginFactory = name;
+            let pluginName    = null;
 
             const outStream = await this._ensureOutStream(output);
 
             if (typeof pluginFactory !== 'function') {
                 try {
                     pluginFactory = require('testcafe-reporter-' + name);
+                    pluginName    = name;
                 }
                 catch (err) {
                     throw new GeneralError(RUNTIME_ERRORS.cannotFindReporterForAlias, name);
                 }
             }
 
+            const plugin = pluginFactory();
+
+            plugin.name = pluginName;
+
             return {
-                plugin: pluginFactory(),
+                plugin,
                 outStream
             };
         }));
@@ -159,10 +180,12 @@ export default class Bootstrapper {
         return isLocalBrowsers.every(result => result);
     }
 
-    async _bootstrapSequence (browserInfo) {
+    async _bootstrapSequence (browserInfo, commonClientScripts) {
         const tests       = await this._getTests();
         const testedApp   = await this._startTestedApp();
         const browserSet  = await this._getBrowserConnections(browserInfo);
+
+        await this._addCommonClientScripts(tests, commonClientScripts);
 
         return { tests, testedApp, browserSet };
     }
@@ -188,7 +211,7 @@ export default class Bootstrapper {
             throw browserSetStatus.error;
     }
 
-    async _bootstrapParallel (browserInfo) {
+    async _bootstrapParallel (browserInfo, commonClientScripts) {
         let bootstrappingPromises = [
             this._getBrowserConnections(browserInfo),
             this._getTests(),
@@ -204,12 +227,28 @@ export default class Bootstrapper {
 
         const [browserSet, tests, testedApp] = bootstrappingStatuses.map(status => status.result);
 
+        await this._addCommonClientScripts(tests, commonClientScripts);
+
         return { browserSet, tests, testedApp };
+    }
+
+    async _addCommonClientScripts (tests, clientScripts) {
+        return Promise.all(tests.map(async test => {
+            if (test.isLegacy)
+                return;
+
+            let loadedTestClientScripts = await loadClientScripts(test.clientScripts, path.dirname(test.testFile.filename));
+
+            loadedTestClientScripts = clientScripts.concat(loadedTestClientScripts);
+
+            test.clientScripts = setUniqueUrls(loadedTestClientScripts);
+        }));
     }
 
     // API
     async createRunnableConfiguration () {
-        const reporterPlugins = await this._getReporterPlugins();
+        const reporterPlugins     = await this._getReporterPlugins();
+        const commonClientScripts = await loadClientScripts(this.clientScripts);
 
         // NOTE: If a user forgot to specify a browser, but has specified a path to tests, the specified path will be
         // considered as the browser argument, and the tests path argument will have the predefined default value.
@@ -218,8 +257,8 @@ export default class Bootstrapper {
         const browserInfo = await this._getBrowserInfo();
 
         if (await this._canUseParallelBootstrapping(browserInfo))
-            return { reporterPlugins, ...await this._bootstrapParallel(browserInfo) };
+            return { reporterPlugins, ...await this._bootstrapParallel(browserInfo, commonClientScripts) };
 
-        return { reporterPlugins, ...await this._bootstrapSequence(browserInfo) };
+        return { reporterPlugins, ...await this._bootstrapSequence(browserInfo, commonClientScripts) };
     }
 }

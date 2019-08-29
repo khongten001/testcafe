@@ -1,13 +1,13 @@
 import TEST_RUN_PHASE from '../test-run/phase';
 import { TEST_RUN_ERRORS } from '../errors/types';
+import { SPECIAL_BLANK_PAGE } from 'testcafe-hammerhead';
 
 import {
     SwitchToMainWindowCommand,
     SwitchToIframeCommand,
     SetNativeDialogHandlerCommand,
     SetTestSpeedCommand,
-    SetPageLoadTimeoutCommand,
-    NavigateToCommand
+    SetPageLoadTimeoutCommand
 } from './commands/actions';
 
 import {
@@ -15,13 +15,12 @@ import {
     CurrentIframeIsNotLoadedError
 } from '../errors/test-run';
 
-
 export default class TestRunBookmark {
     constructor (testRun, role) {
         this.testRun = testRun;
         this.role    = role;
 
-        this.url             = 'about:blank';
+        this.url             = SPECIAL_BLANK_PAGE;
         this.dialogHandler   = testRun.activeDialogHandler;
         this.iframeSelector  = testRun.activeIframeSelector;
         this.speed           = testRun.speed;
@@ -85,9 +84,7 @@ export default class TestRunBookmark {
     }
 
     async _restorePage (url, stateSnapshot) {
-        const navigateCommand = new NavigateToCommand({ url, stateSnapshot });
-
-        await this.testRun.executeCommand(navigateCommand);
+        await this.testRun.navigateToUrl(url, true, JSON.stringify(stateSnapshot));
     }
 
     async restore (callsite, stateSnapshot) {
@@ -105,9 +102,9 @@ export default class TestRunBookmark {
             await this._restoreDialogHandler();
 
             const preserveUrl = this.role.opts.preserveUrl;
-            const url = preserveUrl ? this.role.url : this.url;
+            const url         = preserveUrl ? this.role.url : this.url;
 
-            await this._restorePage(url, JSON.stringify(stateSnapshot));
+            await this._restorePage(url, stateSnapshot);
 
             if (!preserveUrl)
                 await this._restoreWorkingFrame();

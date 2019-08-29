@@ -39,13 +39,13 @@
             .replace('{{{cookie}}}', cookie || '');
     };
 
-    window.initIFrameTestHandler = function (e) {
+    window.initIFrameTestHandler = function (iframe) {
         const referer          = location;
         const serviceMsg       = '/service-msg/100';
         const iframeTaskScript = window.getIframeTaskScript(referer, serviceMsg, location).replace(/"/g, '\\"');
 
-        if (e.iframe.id.indexOf('test') !== -1) {
-            e.iframe.contentWindow.eval.call(e.iframe.contentWindow, [
+        if (iframe.id.indexOf('test') !== -1) {
+            iframe.contentWindow.eval.call(iframe.contentWindow, [
                 'window["%hammerhead%"].get("./utils/destination-location").forceLocation("' + location + '");',
                 'window["%hammerhead%"].start({',
                 '    referer : "' + referer + '",',
@@ -102,12 +102,12 @@
     // With this hack, we only allow setting the scroll by a script and prevent native browser scrolling.
     if (hammerhead.utils.browser.isIOS) {
         document.addEventListener('DOMContentLoaded', function () {
-            const originWindowScrollTo = window.scrollTo;
+            const originWindowScrollTo = hammerhead.nativeMethods.scrollTo;
 
             let lastScrollTop        = window.scrollY;
             let lastScrollLeft       = window.scrollX;
 
-            window.scrollTo = function () {
+            hammerhead.nativeMethods.scrollTo = function () {
                 lastScrollLeft = arguments[0];
                 lastScrollTop  = arguments[1];
 

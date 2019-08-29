@@ -4,12 +4,10 @@ const path                    = require('path');
 const chai                    = require('chai');
 const { expect }              = chai;
 const request                 = require('request');
-const Promise                 = require('pinkie');
 const { noop, times, uniqBy } = require('lodash');
 const createTestCafe          = require('../../lib/');
 const COMMAND                 = require('../../lib/browser/connection/command');
 const Task                    = require('../../lib/runner/task');
-const Reporter                = require('../../lib/reporter');
 const BrowserConnection       = require('../../lib/browser/connection');
 const BrowserSet              = require('../../lib/runner/browser-set');
 const browserProviderPool     = require('../../lib/browser/provider/pool');
@@ -748,6 +746,21 @@ describe('Runner', () => {
         });
     });
 
+    describe('.clientScripts', () => {
+        it('Should raise an error for the multiple ".clientScripts" method call', () => {
+            try {
+                runner
+                    .clientScripts({ source: 'var i = 0;' })
+                    .clientScripts({ source: 'var i = 1;' });
+
+                throw new Error('Should raise an appropriate error.');
+            }
+            catch (err) {
+                expect(err.message).startsWith('You cannot call the "clientScripts" method more than once. Pass an array of parameters to this method instead.');
+            }
+        });
+    });
+
     describe('Regression', () => {
         it('Should not have unhandled rejections in runner (GH-825)', () => {
             let rejectionReason = null;
@@ -781,8 +794,6 @@ describe('Runner', () => {
 
         const origCreateBrowserJobs = Task.prototype._createBrowserJobs;
         const origAbort             = Task.prototype.abort;
-
-        const origAssignTaskEventHandlers = Reporter.prototype._assignTaskEventHandlers;
 
         let closeCalled        = 0;
         let abortCalled        = false;
@@ -853,8 +864,6 @@ describe('Runner', () => {
             Task.prototype.abort = () => {
                 abortCalled = true;
             };
-
-            Reporter.prototype._assignTaskEventHandlers = noop;
         });
 
         after(() => {
@@ -862,8 +871,6 @@ describe('Runner', () => {
 
             Task.prototype._createBrowserJobs = origCreateBrowserJobs;
             Task.prototype.abort              = origAbort;
-
-            Reporter.prototype._assignTaskEventHandlers = origAssignTaskEventHandlers;
         });
 
         it('Should not stop the task until local connection browsers are not closed when task done', () => {

@@ -10,11 +10,9 @@ import getLineRectIntersection from '../../utils/get-line-rect-intersection';
 import getDevicePoint from '../../utils/get-device-point';
 import nextTick from '../../utils/next-tick';
 import AutomationSettings from '../../settings';
-
 import DragAndDropState from '../drag/drag-and-drop-state';
-import moveEventSequence from './event-sequence';
-import dragAndDropMoveEventSequence from './event-sequence/drag-and-drop-move';
-import dragAndDropFirstMoveEventSequence from './event-sequence/drag-and-drop-first-move';
+import createEventSequence from './event-sequence/create-event-sequence';
+import lastHoveredElementHolder from '../last-hovered-element-holder';
 
 const Promise          = hammerhead.Promise;
 const nativeMethods    = hammerhead.nativeMethods;
@@ -58,15 +56,11 @@ function findDraggableElement (element) {
         if (parentNode.draggable)
             return parentNode;
 
-        parentNode = parentNode.parentNode;
+        parentNode = nativeMethods.nodeParentNodeGetter.call(parentNode);
     }
 
     return null;
 }
-
-// Static
-let lastHoveredElement = null;
-
 
 export default class MoveAutomation {
     constructor (element, moveOptions) {
@@ -191,9 +185,11 @@ export default class MoveAutomation {
             const clientY = startY - iframeRectangle.top;
 
             // NOTE: We should not emulate mouseout and mouseleave if iframe was reloaded.
-            if (lastHoveredElement) {
-                eventSimulator.mouseout(lastHoveredElement, { clientX, clientY, relatedTarget: null });
-                eventSimulator.mouseleave(lastHoveredElement, { clientX, clientY, relatedTarget: null });
+            const element = lastHoveredElementHolder.get();
+
+            if (element) {
+                eventSimulator.mouseout(element, { clientX, clientY, relatedTarget: null });
+                eventSimulator.mouseleave(element, { clientX, clientY, relatedTarget: null });
             }
 
             messageSandbox.sendServiceMsg({ cmd: MOVE_RESPONSE_CMD }, parentWin);
@@ -288,21 +284,22 @@ export default class MoveAutomation {
             dataTransfer: this.dragAndDropState.dataTransfer
         };
 
-        let eventSequence = null;
+        const eventSequenceOptions = { moveEvent: this.moveEvent, holdLeftButton: this.holdLeftButton };
+        const eventSequence        = createEventSequence(this.dragAndDropState.enabled, this.firstMovingStepOccured, eventSequenceOptions);
 
-        if (this.dragAndDropState.enabled)
-            eventSequence = this.firstMovingStepOccured ? dragAndDropMoveEventSequence : dragAndDropFirstMoveEventSequence;
-        else
-            eventSequence = moveEventSequence;
-
-        const { dragAndDropMode, dropAllowed } = eventSequence.run(currentElement, lastHoveredElement, eventOptions,
-            this.moveEvent, this.dragElement, this.dragAndDropState.dataStore);
+        const { dragAndDropMode, dropAllowed } = eventSequence.run(
+            currentElement,
+            lastHoveredElementHolder.get(),
+            eventOptions,
+            this.dragElement,
+            this.dragAndDropState.dataStore
+        );
 
         this.firstMovingStepOccured       = true;
         this.dragAndDropState.enabled     = dragAndDropMode;
         this.dragAndDropState.dropAllowed = dropAllowed;
 
-        lastHoveredElement = currentElement;
+        lastHoveredElementHolder.set(currentElement);
     }
 
     _movingStep () {

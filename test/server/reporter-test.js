@@ -1,5 +1,4 @@
 const { expect }        = require('chai');
-const Promise           = require('pinkie');
 const { chunk, random } = require('lodash');
 const Reporter          = require('../../lib/reporter');
 const AsyncEventEmitter = require('../../lib/utils/async-event-emitter');
@@ -359,6 +358,13 @@ describe('Reporter', () => {
                     .then(() => log.push({ method: 'reportFixtureStart', args: Array.prototype.slice.call(arguments) }));
             },
 
+            reportTestStart: function (...args) {
+                expect(args[0]).to.be.an('string');
+
+                return delay(1000)
+                    .then(() => log.push({ method: 'reportTestStart', args: args }));
+            },
+
             reportTestDone: function (...args) {
                 expect(args[1].durationMs).to.be.an('number');
 
@@ -413,6 +419,15 @@ describe('Reporter', () => {
                 ]
             },
             'task-start resolved',
+            {
+                method: 'reportTestStart',
+                args:   [
+                    'fixture1test1',
+                    {
+                        run: 'run-001'
+                    }
+                ]
+            },
             'test-run-start resolved',
             'test-run-start resolved',
             {
@@ -445,6 +460,15 @@ describe('Reporter', () => {
             },
             'test-run-done resolved',
             'test-run-done resolved',
+            {
+                method: 'reportTestStart',
+                args:   [
+                    'fixture1test2',
+                    {
+                        run: 'run-001'
+                    }
+                ]
+            },
             'test-run-start resolved',
             'test-run-start resolved',
             {
@@ -494,6 +518,15 @@ describe('Reporter', () => {
             },
             'test-run-done resolved',
             'test-run-done resolved',
+            {
+                method: 'reportTestStart',
+                args:   [
+                    'fixture1test3',
+                    {
+                        run: 'run-001'
+                    }
+                ]
+            },
             'test-run-start resolved',
             'test-run-start resolved',
             {
@@ -527,6 +560,15 @@ describe('Reporter', () => {
             },
             'test-run-done resolved',
             'test-run-done resolved',
+            {
+                method: 'reportTestStart',
+                args:   [
+                    'fixture2test1',
+                    {
+                        run: 'run-001'
+                    }
+                ]
+            },
             'test-run-start resolved',
             'test-run-start resolved',
             {
@@ -550,6 +592,15 @@ describe('Reporter', () => {
             },
             'test-run-done resolved',
             'test-run-done resolved',
+            {
+                method: 'reportTestStart',
+                args:   [
+                    'fixture2test2',
+                    {
+                        run: 'run-001'
+                    }
+                ]
+            },
             'test-run-start resolved',
             'test-run-start resolved',
             {
@@ -581,6 +632,15 @@ describe('Reporter', () => {
             },
             'test-run-done resolved',
             'test-run-done resolved',
+            {
+                method: 'reportTestStart',
+                args:   [
+                    'fixture3test1',
+                    {
+                        run: 'run-001'
+                    }
+                ]
+            },
             'test-run-start resolved',
             'test-run-start resolved',
             {
@@ -610,6 +670,15 @@ describe('Reporter', () => {
             },
             'test-run-done resolved',
             'test-run-done resolved',
+            {
+                method: 'reportTestStart',
+                args:   [
+                    'fixture3test2',
+                    {
+                        run: 'run-001'
+                    }
+                ]
+            },
             'test-run-start resolved',
             'test-run-start resolved',
             {
@@ -633,6 +702,15 @@ describe('Reporter', () => {
             },
             'test-run-done resolved',
             'test-run-done resolved',
+            {
+                method: 'reportTestStart',
+                args:   [
+                    'fixture3test3',
+                    {
+                        run: 'run-001'
+                    }
+                ]
+            },
             'test-run-start resolved',
             'test-run-start resolved',
             {

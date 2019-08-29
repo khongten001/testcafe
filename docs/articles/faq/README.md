@@ -32,7 +32,6 @@ which allows it to work without the WebDriver.
 This proxy injects the driver script that emulates user actions into the tested page.
 
 You can read about this in our [forum](https://testcafe-discuss.devexpress.com/t/why-not-use-selenium/47).
-Feel free to ask for more details.
 
 ### What is the difference between [TestCafe Studio](https://www.devexpress.com/products/testcafestudio/) and [open-source TestCafe](https://devexpress.github.io/testcafe)?
 
@@ -56,7 +55,7 @@ The table below compares TestCafe and TestCafe Studio:
 | Free and open-source | &#10003; | &nbsp; |
 | [Visual Test Recorder](https://docs.devexpress.com/TestCafeStudio/400165/guides/record-tests) | &nbsp; | &#10003; |
 | [Interactive Test Editor](https://docs.devexpress.com/TestCafeStudio/400190/user-interface/test-editor) | &nbsp; | &#10003; |
-| [Automatic Selector Generation](https://docs.devexpress.com/TestCafeStudio/400407/guides/record-tests/element-selectors#auto-generated-element-selectors) | &nbsp; | &#10003; |
+| [Automatic Selector Generation](https://docs.devexpress.com/TestCafeStudio/400407/test-actions/element-selectors#auto-generated-element-selectors) | &nbsp; | &#10003; |
 | [Run Configuration Manager](https://docs.devexpress.com/TestCafeStudio/400189/user-interface/run-configurations-dialog) | &nbsp; | &#10003; |
 | [IDE-like GUI](https://docs.devexpress.com/TestCafeStudio/400181/user-interface/code-editor) | &nbsp; | &#10003; |
 
@@ -137,40 +136,7 @@ fixture `Fixture`
     .page `${config.baseUrl}/test1/index.html`;
 ```
 
-Alternatively, you can use custom command line parameters or environment variables.
-
-The following command passes the `env` argument to the test code:
-
-```sh
-testcafe chrome test.js --env=development
-```
-
-In the test, use an argument parser library (like `minimist`) to parse custom arguments:
-
-```js
-import minimist from 'minimist';
-
-const args = minimist(process.argv.slice(2));
-const environment = args.env;
-
-fixture('example')
-    .page('http://example.com');
-
-test('check environment', async t => {
-  console.log('Environment:', environment);
-});
-```
-
-To set an environment variable, use the following command on Windows:
-
-```sh
-set DEV_MODE=true
-testcafe chrome test.js
-```
-
-On macOS, [the workflow is longer](https://stackoverflow.com/questions/135688/setting-environment-variables-in-os-x).
-
-In test code, you can access this variable as `process.env.DEV_MODE`.
+Alternatively, you can use [environment variables](../documentation/recipes/access-environment-variables-in-tests.md).
 
 ## Troubleshooting
 

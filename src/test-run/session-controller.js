@@ -43,16 +43,12 @@ export default class SessionController extends Session {
     }
 
     onPageRequest (ctx) {
-        const requireStateSwitch   = this.requireStateSwitch;
         const pendingStateSnapshot = this.pendingStateSnapshot;
 
         super.onPageRequest(ctx);
 
-        if (requireStateSwitch && ctx.req.headers[UNSTABLE_NETWORK_MODE_HEADER]) {
-            this.requireStateSwitch = true;
-
+        if (pendingStateSnapshot && ctx.req.headers[UNSTABLE_NETWORK_MODE_HEADER])
             this.pendingStateSnapshot = pendingStateSnapshot;
-        }
     }
     // API
     static getSession (testRun) {
@@ -71,6 +67,8 @@ export default class SessionController extends Session {
 
                 session.currentTestRun = testRun;
             }
+
+            session.disablePageCaching = testRun.disablePageCaching;
 
             sessionInfo = {
                 session: session,

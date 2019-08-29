@@ -4,12 +4,8 @@ import PHASE from './phase';
 import { assertType, is } from '../errors/runtime/type-assertions';
 import wrapTestFunction from '../api/wrap-test-function';
 import { resolvePageUrl } from '../api/test-page-url';
-import { NavigateToCommand } from '../test-run/commands/actions';
 import roleMarker from './marker-symbol';
-import delay from '../utils/delay';
 import { StateSnapshot } from 'testcafe-hammerhead';
-
-const COOKIE_SYNC_DELAY = 100;
 
 class Role extends EventEmitter {
     constructor (loginPage, initFn, options = {}) {
@@ -29,18 +25,11 @@ class Role extends EventEmitter {
         this.initErr       = null;
     }
 
-    async _navigateToLoginPage (testRun) {
-        const navigateCommand = new NavigateToCommand({ url: this.loginPage });
-
-        await testRun.executeCommand(navigateCommand);
-    }
-
     async _storeStateSnapshot (testRun) {
-        if (!this.initErr) {
-            // NOTE: give Hammerhead time to sync cookies from client
-            await delay(COOKIE_SYNC_DELAY);
-            this.stateSnapshot = await testRun.getStateSnapshot();
-        }
+        if (this.initErr)
+            return;
+
+        this.stateSnapshot = await testRun.getStateSnapshot();
     }
 
     async _executeInitFn (testRun) {
@@ -59,8 +48,8 @@ class Role extends EventEmitter {
     async initialize (testRun) {
         this.phase = PHASE.pendingInitialization;
 
-        await testRun.switchToCleanRun();
-        await this._navigateToLoginPage(testRun);
+        await testRun.switchToCleanRun(this.loginPage);
+
         await this._executeInitFn(testRun);
         await this._storeStateSnapshot(testRun);
 

@@ -1,10 +1,10 @@
 // TODO: once we'll have client commons load it from there instead of node modules (currently it's leads to two copies of this packages on client)
+// TODO: Get rid of Pinkie after dropping IE11
 import Promise from 'pinkie';
 import COMMAND from '../../browser/connection/command';
 import STATUS from '../../browser/connection/status';
 import { UNSTABLE_NETWORK_MODE_HEADER } from '../../browser/connection/unstable-network-mode';
-
-const HEARTBEAT_INTERVAL = 2 * 1000;
+import { HEARTBEAT_INTERVAL } from '../../utils/browser-connection-timeouts';
 
 let allowInitScriptExecution = false;
 let retryTestPages           = false;

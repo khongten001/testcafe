@@ -13,6 +13,8 @@ fixture.requestHooks(...hooks)
 test.requestHooks(...hooks)
 ```
 
+> If you attach request hooks to both the fixture and test, hooks attached to the fixture run first.
+
 You can also attach and detach hooks during test run using the `t.addRequestHooks` and `t.removeRequestHooks` methods.
 
 ```text
@@ -24,7 +26,7 @@ Parameter | Type | Description
 --------- | ---- | ------------
 `hooks`    | RequestHook subclass | A `RequestLogger`, `RequestMock` or custom user-defined hook.
 
-The `fixture.requestHooks`, `test.requestHooks` `t.addRequestHooks` and `t.removeRequestHooks` methods use the rest operator which allows you to pass multiple hooks as parameters or arrays of hooks.
+The `fixture.requestHooks`, `test.requestHooks`, `t.addRequestHooks` and `t.removeRequestHooks` methods use the rest operator which allows you to pass multiple hooks as parameters or arrays of hooks.
 
 ```js
 import { RequestLogger, RequestMock } from 'testcafe';

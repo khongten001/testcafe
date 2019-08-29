@@ -163,6 +163,23 @@ export class UncaughtExceptionError extends TestRunErrorBase {
     }
 }
 
+export class UncaughtErrorInCustomClientScriptCode extends TestRunErrorBase {
+    constructor (err) {
+        super(TEST_RUN_ERRORS.uncaughtErrorInCustomClientScriptCode);
+
+        this.errMsg = String(err);
+    }
+}
+
+export class UncaughtErrorInCustomClientScriptLoadedFromModule extends TestRunErrorBase {
+    constructor (err, moduleName) {
+        super(TEST_RUN_ERRORS.uncaughtErrorInCustomClientScriptCodeLoadedFromModule);
+
+        this.errMsg     = String(err);
+        this.moduleName = moduleName;
+    }
+}
+
 
 // Assertion errors
 //--------------------------------------------------------------------
@@ -420,6 +437,19 @@ export class ActionInvalidScrollTargetError extends TestRunErrorBase {
     }
 }
 
+export class ExecuteAsyncExpressionError extends TestRunErrorBase {
+    constructor (err, expression, line, column, callsite) {
+        super(TEST_RUN_ERRORS.executeAsyncExpressionError);
+
+        this.errMsg     = err.message;
+        this.callsite   = callsite;
+        this.errStack   = err.stack;
+        this.expression = expression;
+        this.line       = line;
+        this.column     = column;
+    }
+}
+
 export class WindowDimensionsOverflowError extends TestRunErrorBase {
     constructor (callsite) {
         super(TEST_RUN_ERRORS.windowDimensionsOverflowError);
@@ -529,3 +559,23 @@ export class SetNativeDialogHandlerCodeWrongTypeError extends TestRunErrorBase {
         this.actualType = actualType;
     }
 }
+
+export class RequestHookUnhandledError extends TestRunErrorBase {
+    constructor (err, hookClassName, methodName) {
+        super(TEST_RUN_ERRORS.requestHookUnhandledError);
+
+        this.errMsg        = String(err);
+        this.hookClassName = hookClassName;
+        this.methodName    = methodName;
+    }
+}
+
+export class RequestHookNotImplementedMethodError extends TestRunErrorBase {
+    constructor (methodName, hookClassName) {
+        super(TEST_RUN_ERRORS.requestHookNotImplementedError);
+
+        this.methodName    = methodName;
+        this.hookClassName = hookClassName;
+    }
+}
+

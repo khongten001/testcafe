@@ -50,7 +50,9 @@ createTestCafe('localhost', 1337, 1338)
     * [Implementing a Custom Stream](#implementing-a-custom-stream)
 * [concurrency](#concurrency)
 * [startApp](#startapp)
+* [clientScripts](#clientscripts)
 * [useProxy](#useproxy)
+* [tsConfigPath](#tsconfigpath)
 * [run](#run)
     * [Cancelling Test Tasks](#cancelling-test-tasks)
     * [Quarantine Mode](#quarantine-mode)
@@ -410,6 +412,44 @@ Parameter         | Type    | Description   Default
 runner.startApp('node server.js', 4000);
 ```
 
+### clientScripts
+
+Injects scripts into pages visited during the tests. Use this method to introduce client-side mock functions or helper scripts.
+
+```text
+async clientScripts( script[, script2[, ...[, scriptN]]] ) → this
+```
+
+Parameter | Type                | Description
+--------- | ------------------- | ------------
+`script`, `script2`, `scriptN`  | String &#124; Object &#124; Array | Scripts to inject into the tested pages. See [Provide Scripts to Inject](../common-concepts/inject-scripts-into-tested-pages.md#provide-scripts-to-inject) to learn how to specify them.
+
+> Relative paths resolve from the current working directory.
+
+You can use the [page](../common-concepts/inject-scripts-into-tested-pages.md#provide-scripts-for-specific-pages) option to specify pages into which scripts should be injected. Otherwise, TestCafe injects scripts into all pages visited during the test run.
+
+```js
+runner.clientScripts('assets/jquery.js');
+```
+
+```js
+runner.clientScripts([
+    {
+        module: 'lodash'
+    },
+    {
+        path: 'scripts/react-helpers.js',
+        page: 'https://myapp.com/page/'
+    }
+]);
+```
+
+The [fixture.clientScripts](../../test-api/test-code-structure.md#inject-scripts-into-tested-pages) and [test.clientScripts](../../test-api/test-code-structure.md#inject-scripts-into-tested-pages) methods allow you to inject scripts into pages visited during an individual fixture or test.
+
+See [Inject Scripts into Tested Pages](../common-concepts/inject-scripts-into-tested-pages.md) for more information.
+
+*Related configuration file property*: [clientScripts](../configuration-file.md#clientscripts)
+
 ### useProxy
 
 Specifies the proxy server used in your local network to access the Internet. Allows you to bypass the proxy when accessing specific resources.
@@ -459,6 +499,24 @@ You can also use the proxy host to specify authentication credentials.
 ```js
 runner.useProxy('username:password@proxy.mycorp.com');
 ```
+
+### tsConfigPath
+
+Enables TestCafe to use a custom [TypeScript configuration file](../../test-api/typescript-support.md#customize-compiler-options) and specifies its location.
+
+```text
+async tsConfigPath(path) → this
+```
+
+Parameter | Type   | Description
+--------- | ------ | ---------------------
+`path`    | String | The absolute or relative path to the TypeScript configuration file. Relative paths resolve from the current directory (the directory from which you run TestCafe).
+
+```js
+runner.tsConfigPath('/Users/s.johnson/testcafe/tsconfig.json');
+```
+
+*Related configuration file property*: [tsConfigPath](../configuration-file.md#tsconfigpath)
 
 ### run
 

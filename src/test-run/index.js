@@ -1,14 +1,18 @@
-import { pull as remove } from 'lodash';
+import { pull, remove, chain } from 'lodash';
 import { readSync as read } from 'read-file-relative';
 import promisifyEvent from 'promisify-event';
-import Promise from 'pinkie';
 import Mustache from 'mustache';
 import AsyncEventEmitter from '../utils/async-event-emitter';
 import debugLogger from '../notifications/debug-logger';
 import TestRunDebugLog from './debug-log';
 import TestRunErrorFormattableAdapter from '../errors/test-run/formattable-adapter';
 import TestCafeErrorList from '../errors/error-list';
-import { PageLoadError, RoleSwitchInRoleInitializerError } from '../errors/test-run/';
+import {
+    RequestHookUnhandledError,
+    PageLoadError,
+    RequestHookNotImplementedMethodError,
+    RoleSwitchInRoleInitializerError
+} from '../errors/test-run/';
 import PHASE from './phase';
 import CLIENT_MESSAGES from './client-messages';
 import COMMAND_TYPE from './commands/type';
@@ -21,7 +25,12 @@ import BrowserConsoleMessages from './browser-console-messages';
 import { UNSTABLE_NETWORK_MODE_HEADER } from '../browser/connection/unstable-network-mode';
 import WarningLog from '../notifications/warning-log';
 import WARNING_MESSAGE from '../notifications/warning-message';
-import { StateSnapshot } from 'testcafe-hammerhead';
+import { StateSnapshot, SPECIAL_ERROR_PAGE } from 'testcafe-hammerhead';
+import { NavigateToCommand } from './commands/actions';
+import * as INJECTABLES from '../assets/injectables';
+import { findProblematicScripts } from '../custom-client-scripts/utils';
+import getCustomClientScriptUrl from '../custom-client-scripts/get-url';
+import { getPluralSuffix, getConcatenatedValuesString } from '../utils/string';
 
 import {
     isCommandRejectableByPageError,
@@ -33,10 +42,11 @@ import {
     isResizeWindowCommand
 } from './commands/utils';
 
+import { TEST_RUN_ERRORS } from '../errors/types';
+
 const lazyRequire                 = require('import-lazy')(require);
 const SessionController           = lazyRequire('./session-controller');
 const ClientFunctionBuilder       = lazyRequire('../client-functions/client-function-builder');
-const executeJsExpression         = lazyRequire('./execute-js-expression');
 const BrowserManipulationQueue    = lazyRequire('./browser-manipulation-queue');
 const TestRunBookmark             = lazyRequire('./bookmark');
 const AssertionExecutor           = lazyRequire('../assertions/executor');
@@ -44,6 +54,7 @@ const actionCommands              = lazyRequire('./commands/actions');
 const browserManipulationCommands = lazyRequire('./commands/browser-manipulation');
 const serviceCommands             = lazyRequire('./commands/service');
 
+const { executeJsExpression, executeAsyncJsExpression } = lazyRequire('./execute-js-expression');
 
 const TEST_RUN_TEMPLATE               = read('../client/test-run/index.js.mustache');
 const IFRAME_TEST_RUN_TEMPLATE        = read('../client/test-run/iframe.js.mustache');
@@ -75,6 +86,7 @@ export default class TestRun extends AsyncEventEmitter {
         this.pageLoadTimeout      = this.opts.pageLoadTimeout;
 
         this.disablePageReloads = test.disablePageReloads || opts.disablePageReloads && test.disablePageReloads !== false;
+        this.disablePageCaching = test.disablePageCaching || opts.disablePageCaching;
 
         this.session = SessionController.getSession(this);
 
@@ -111,15 +123,34 @@ export default class TestRun extends AsyncEventEmitter {
 
         this.quarantine = null;
 
-        this.injectable.scripts.push('/testcafe-core.js');
-        this.injectable.scripts.push('/testcafe-ui.js');
-        this.injectable.scripts.push('/testcafe-automation.js');
-        this.injectable.scripts.push('/testcafe-driver.js');
-        this.injectable.styles.push('/testcafe-ui-styles.css');
-
-        this.requestHooks = Array.from(this.test.requestHooks);
-
+        this._addInjectables();
         this._initRequestHooks();
+    }
+
+    _addClientScriptContentWarningsIfNecessary () {
+        const { empty, duplicatedContent } = findProblematicScripts(this.test.clientScripts);
+
+        if (empty.length)
+            this.warningLog.addWarning(WARNING_MESSAGE.clientScriptsWithEmptyContent);
+
+        if (duplicatedContent.length) {
+            const suffix                            = getPluralSuffix(duplicatedContent);
+            const duplicatedContentClientScriptsStr = getConcatenatedValuesString(duplicatedContent, ',\n ');
+
+            this.warningLog.addWarning(WARNING_MESSAGE.clientScriptsWithDuplicatedContent, suffix, duplicatedContentClientScriptsStr);
+        }
+    }
+
+    _addInjectables () {
+        this._addClientScriptContentWarningsIfNecessary();
+        this.injectable.scripts.push(...INJECTABLES.SCRIPTS);
+        this.injectable.userScripts.push(...this.test.clientScripts.map(script => {
+            return {
+                url:  getCustomClientScriptUrl(script),
+                page: script.page
+            };
+        }));
+        this.injectable.styles.push(INJECTABLES.TESTCAFE_UI_STYLES);
     }
 
     get id () {
@@ -146,7 +177,7 @@ export default class TestRun extends AsyncEventEmitter {
         if (this.requestHooks.indexOf(hook) === -1)
             return;
 
-        remove(this.requestHooks, hook);
+        pull(this.requestHooks, hook);
         this._disposeRequestHook(hook);
     }
 
@@ -159,8 +190,21 @@ export default class TestRun extends AsyncEventEmitter {
                 onRequest:           hook.onRequest.bind(hook),
                 onConfigureResponse: hook._onConfigureResponse.bind(hook),
                 onResponse:          hook.onResponse.bind(hook)
-            });
+            }, err => this._onRequestHookMethodError(err, hook));
         });
+    }
+
+    _onRequestHookMethodError (event, hook) {
+        let err                                      = event.error;
+        const isRequestHookNotImplementedMethodError = err instanceof RequestHookNotImplementedMethodError;
+
+        if (!isRequestHookNotImplementedMethodError) {
+            const hookClassName = hook.constructor.name;
+
+            err = new RequestHookUnhandledError(err, hookClassName, event.methodName);
+        }
+
+        this.addError(err);
     }
 
     _disposeRequestHook (hook) {
@@ -172,6 +216,8 @@ export default class TestRun extends AsyncEventEmitter {
     }
 
     _initRequestHooks () {
+        this.requestHooks = Array.from(this.test.requestHooks);
+
         this.requestHooks.forEach(hook => this._initRequestHook(hook));
     }
 
@@ -231,7 +277,7 @@ export default class TestRun extends AsyncEventEmitter {
 
         this.pendingPageError = new PageLoadError(err, ctx.reqOpts.url);
 
-        ctx.redirect(ctx.toProxyUrl('about:error'));
+        ctx.redirect(ctx.toProxyUrl(SPECIAL_ERROR_PAGE));
     }
 
     // Test function execution
@@ -305,6 +351,8 @@ export default class TestRun extends AsyncEventEmitter {
         await this.executeCommand(new serviceCommands.TestDoneCommand());
 
         this._addPendingPageErrorIfAny();
+        this.session.clearRequestEventListeners();
+        this.normalizeRequestHookErrors();
 
         delete testRunTracker.activeTestRuns[this.session.id];
 
@@ -338,6 +386,22 @@ export default class TestRun extends AsyncEventEmitter {
 
             this.errs.push(adapter);
         });
+    }
+
+    normalizeRequestHookErrors () {
+        const requestHookErrors = remove(this.errs, e =>
+            e.code === TEST_RUN_ERRORS.requestHookNotImplementedError ||
+            e.code === TEST_RUN_ERRORS.requestHookUnhandledError);
+
+        if (!requestHookErrors.length)
+            return;
+
+        const uniqRequestHookErrors = chain(requestHookErrors)
+            .uniqBy(e => e.hookClassName + e.methodName)
+            .sortBy(['hookClassName', 'methodName'])
+            .value();
+
+        this.errs = this.errs.concat(uniqRequestHookErrors);
     }
 
     // Task queue
@@ -472,23 +536,14 @@ export default class TestRun extends AsyncEventEmitter {
     }
 
     // Execute command
-    async _executeExpression (command) {
-        const { resultVariableName, isAsyncExpression } = command;
-
-        let expression = command.expression;
-
-        if (isAsyncExpression)
-            expression = `await ${expression}`;
+    _executeJsExpression (command) {
+        const resultVariableName = command.resultVariableName;
+        let expression           = command.expression;
 
         if (resultVariableName)
             expression = `${resultVariableName} = ${expression}, ${resultVariableName}`;
 
-        if (isAsyncExpression)
-            expression = `(async () => { return ${expression}; }).apply(this);`;
-
-        const result = executeJsExpression(expression, this, { skipVisibilityCheck: false });
-
-        return isAsyncExpression ? await result : result;
+        return executeJsExpression(expression, this, { skipVisibilityCheck: false });
     }
 
     async _executeAssertion (command, callsite) {
@@ -578,7 +633,10 @@ export default class TestRun extends AsyncEventEmitter {
             return this._executeAssertion(command, callsite);
 
         if (command.type === COMMAND_TYPE.executeExpression)
-            return await this._executeExpression(command, callsite);
+            return await this._executeJsExpression(command, callsite);
+
+        if (command.type === COMMAND_TYPE.executeAsyncExpression)
+            return await executeAsyncJsExpression(command.expression, this, callsite);
 
         if (command.type === COMMAND_TYPE.getBrowserConsoleMessages)
             return await this._enqueueBrowserConsoleMessagesCommand(command, callsite);
@@ -604,18 +662,12 @@ export default class TestRun extends AsyncEventEmitter {
         return state;
     }
 
-    async switchToCleanRun () {
+    async switchToCleanRun (url) {
         this.ctx             = Object.create(null);
         this.fixtureCtx      = Object.create(null);
         this.consoleMessages = new BrowserConsoleMessages();
 
         this.session.useStateSnapshot(StateSnapshot.empty());
-
-        if (this.activeDialogHandler) {
-            const removeDialogHandlerCommand = new actionCommands.SetNativeDialogHandlerCommand({ dialogHandler: { fn: null } });
-
-            await this.executeCommand(removeDialogHandlerCommand);
-        }
 
         if (this.speed !== this.opts.speed) {
             const setSpeedCommand = new actionCommands.SetTestSpeedCommand({ speed: this.opts.speed });
@@ -628,6 +680,20 @@ export default class TestRun extends AsyncEventEmitter {
 
             await this.executeCommand(setPageLoadTimeoutCommand);
         }
+
+        await this.navigateToUrl(url, true);
+
+        if (this.activeDialogHandler) {
+            const removeDialogHandlerCommand = new actionCommands.SetNativeDialogHandlerCommand({ dialogHandler: { fn: null } });
+
+            await this.executeCommand(removeDialogHandlerCommand);
+        }
+    }
+
+    async navigateToUrl (url, forceReload, stateSnapshot) {
+        const navigateCommand = new NavigateToCommand({ url, forceReload, stateSnapshot });
+
+        await this.executeCommand(navigateCommand);
     }
 
     async _getStateSnapshotFromRole (role) {

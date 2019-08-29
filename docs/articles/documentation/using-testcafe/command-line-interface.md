@@ -48,6 +48,7 @@ testcafe [options] <browser-list-comma-separated> <file-or-glob ...>
   * [--assertion-timeout \<ms\>](#--assertion-timeout-ms)
   * [--page-load-timeout \<ms\>](#--page-load-timeout-ms)
   * [--speed \<factor\>](#--speed-factor)
+  * [--cs \<path\[,path2,...\]\>, --client-scripts \<path\[,path2,...\]\>](#--cs-pathpath2---client-scripts-pathpath2)
   * [--ports \<port1,port2\>](#--ports-port1port2)
   * [--hostname \<name\>](#--hostname-name)
   * [--proxy \<host\>](#--proxy-host)
@@ -57,6 +58,7 @@ testcafe [options] <browser-list-comma-separated> <file-or-glob ...>
   * [--dev](#--dev)
   * [--qr-code](#--qr-code)
   * [--sf, --stop-on-first-fail](#--sf---stop-on-first-fail)
+  * [--ts-config-path \<path\>](#--ts-config-path-path)
   * [--color](#--color)
   * [--no-color](#--no-color)
 
@@ -627,6 +629,30 @@ If the speed is also specified for an [individual action](../test-api/actions/ac
 
 *Related configuration file property*: [speed](configuration-file.md#speed).
 
+### --cs \<path\[,path2,...\]\>, --client-scripts \<path\[,path2,...\]\>
+
+Injects scripts from the specified files into each page visited during the tests. Use this option to introduce client-side mock functions or helper scripts.
+
+```sh
+testcafe chrome my-tests --client-scripts mockDate.js,assets/react-helpers.js
+```
+
+Pass the [path to a JavaScript file](common-concepts/inject-scripts-into-tested-pages.md#inject-a-javascript-file) to inject its content.
+
+> Relative paths resolve from the current working directory.
+
+Use the [fixture.clientScripts](../test-api/test-code-structure.md#inject-scripts-into-tested-pages) and [test.clientScripts](../test-api/test-code-structure.md#inject-scripts-into-tested-pages) methods in test code to inject scripts for an individual fixture or test.
+
+You can also [inject modules](common-concepts/inject-scripts-into-tested-pages.md#inject-a-module), [code strings](common-concepts/inject-scripts-into-tested-pages.md#inject-script-code), or [add scripts to individual pages](common-concepts/inject-scripts-into-tested-pages.md#provide-scripts-for-specific-pages) in the API and configuration file. Use the following methods and options to do this:
+
+* the [runner.clientScripts](programming-interface/runner.md#clientscripts) programming interface method
+* the [clientScripts](configuration-file.md#clientscripts) configuration file property
+* the [fixture.clientScripts](../test-api/test-code-structure.md#inject-scripts-into-tested-pages) and [test.clientScripts](../test-api/test-code-structure.md#inject-scripts-into-tested-pages) test API methods (add scripts to pages visited during a particular fixture or test)
+
+See [Inject Scripts into Tested Pages](common-concepts/inject-scripts-into-tested-pages.md) for more information.
+
+*Related configuration file property*: [clientScripts](configuration-file.md#clientscripts).
+
 ### --ports \<port1,port2\>
 
 Specifies custom port numbers TestCafe uses to perform testing. The number range is [0-65535].
@@ -673,7 +699,7 @@ testcafe chrome my-tests/**/*.js --proxy username:password@proxy.mycorp.com
 
 ### --proxy-bypass \<rules\>
 
-Specifies the resources accessed bypassing the proxy server.
+Requires that TestCafe bypasses the proxy server to access the specified resources.
 
 When you access the Internet through a proxy server specified using the [--proxy](#--proxy-host) option, you may still need some local or external resources to be accessed directly. In this instance, provide their URLs to the `--proxy-bypass` option.
 
@@ -714,7 +740,7 @@ testcafe --ssl pfx=path/to/file.pfx;rejectUnauthorized=true;...
 
 Provide the `--ssl` flag if the tested webpage uses browser features that require
 secure origin ([Service Workers](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API), [Geolocation API](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API), [ApplePaySession](https://developer.apple.com/documentation/apple_pay_on_the_web/applepaysession), [SubtleCrypto](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto), etc).
-See [Connect to the TestCafe Server over HTTPS](common-concepts/connect-to-the-testcafe-server-over-https.md) for more information.
+See [Test HTTPS and HTTP/2 Websites](common-concepts/test-https-and-http2-websites.md) for more information.
 
 *Related configuration file property*: [ssl](configuration-file.md#ssl).
 
@@ -746,13 +772,25 @@ testcafe remote my-tests --qr-code
 
 ### --sf, --stop-on-first-fail
 
-Stops an entire test run if any test fails. This allows you not to wait for all the tests included in the test task to finish and allows focusing on the first error.
+Stops an entire test run if any test fails. Use this option when you want to fix failed tests individually and do not need a report on all the failures.
 
 ```sh
 testcafe chrome my-tests --sf
 ```
 
 *Related configuration file property*: [stopOnFirstFail](configuration-file.md#stoponfirstfail).
+
+### --ts-config-path \<path\>
+
+Enables TestCafe to use a custom [TypeScript configuration file](../test-api/typescript-support.md#customize-compiler-options) and specifies its location.
+
+```sh
+testcafe chrome my-tests --ts-config-path /Users/s.johnson/testcafe/tsconfig.json
+```
+
+You can specify an absolute or relative path. Relative paths resolve from the current directory (the directory from which you run TestCafe).
+
+*Related configuration file property*: [tsConfigPath](configuration-file.md#tsconfigpath).
 
 ### --color
 

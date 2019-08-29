@@ -1,5 +1,4 @@
 const path                       = require('path');
-const Promise                    = require('pinkie');
 const SlConnector                = require('saucelabs-connector');
 const BsConnector                = require('browserstack-connector');
 const caller                     = require('caller');
@@ -173,33 +172,38 @@ before(function () {
             global.testReport = null;
             global.testCafe   = testCafe;
 
-            global.runTests = (fixture, testName, opts) => {
+            global.runTests = (fixture, testName, opts = {}) => {
                 const stream                      = createSimpleTestStream();
                 const runner                      = testCafe.createRunner();
                 const fixturePath                 = typeof fixture !== 'string' ||
                                                     path.isAbsolute(fixture) ? fixture : path.join(path.dirname(caller()), fixture);
-                const skipJsErrors                = opts && opts.skipJsErrors;
-                const disablePageReloads          = opts && opts.disablePageReloads;
-                const quarantineMode              = opts && opts.quarantineMode;
                 const selectorTimeout             = opts && opts.selectorTimeout || FUNCTIONAL_TESTS_SELECTOR_TIMEOUT;
                 const assertionTimeout            = opts && opts.assertionTimeout || FUNCTIONAL_TESTS_ASSERTION_TIMEOUT;
                 const pageLoadTimeout             = opts && opts.pageLoadTimeout || FUNCTIONAL_TESTS_PAGE_LOAD_TIMEOUT;
-                const onlyOption                  = opts && opts.only;
-                const skipOption                  = opts && opts.skip;
                 const screenshotPath              = opts && opts.setScreenshotPath ? config.testScreenshotsDir : '';
-                const screenshotPathPattern       = opts && opts.screenshotPathPattern;
-                const screenshotsOnFails          = opts && opts.screenshotsOnFails;
                 const videoPath                   = opts && opts.setVideoPath ? config.testVideosDir : '';
-                const videoOptions                = opts && opts.videoOptions;
-                const videoEncodingOptions        = opts && opts.videoEncodingOptions;
-                const speed                       = opts && opts.speed;
-                const appCommand                  = opts && opts.appCommand;
-                const appInitDelay                = opts && opts.appInitDelay;
-                const proxy                       = opts && opts.useProxy;
-                const proxyBypass                 = opts && opts.proxyBypass;
-                const customReporters             = opts && opts.reporter;
-                const skipUncaughtErrors          = opts && opts.skipUncaughtErrors;
-                const stopOnFirstFail             = opts && opts.stopOnFirstFail;
+                const clientScripts               = opts && opts.clientScripts || [];
+
+                const {
+                    skipJsErrors,
+                    disablePageReloads,
+                    quarantineMode,
+                    screenshotPathPattern,
+                    screenshotsOnFails,
+                    videoOptions,
+                    videoEncodingOptions,
+                    speed,
+                    appCommand,
+                    appInitDelay,
+                    proxyBypass,
+                    skipUncaughtErrors,
+                    reporter: customReporters,
+                    useProxy: proxy,
+                    only: onlyOption,
+                    skip: skipOption,
+                    stopOnFirstFail,
+                    disablePageCaching
+                } = opts;
 
                 const actualBrowsers = browsersInfo.filter(browserInfo => {
                     const { alias, userAgent } = browserInfo.settings;
@@ -245,6 +249,7 @@ before(function () {
                     .screenshots(screenshotPath, screenshotsOnFails, screenshotPathPattern)
                     .video(videoPath, videoOptions, videoEncodingOptions)
                     .startApp(appCommand, appInitDelay)
+                    .clientScripts(clientScripts)
                     .run({
                         skipJsErrors,
                         disablePageReloads,
@@ -254,7 +259,8 @@ before(function () {
                         pageLoadTimeout,
                         speed,
                         stopOnFirstFail,
-                        skipUncaughtErrors
+                        skipUncaughtErrors,
+                        disablePageCaching
                     })
                     .then(failedCount => {
                         if (customReporters)

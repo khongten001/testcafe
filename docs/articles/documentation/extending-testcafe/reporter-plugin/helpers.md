@@ -6,7 +6,7 @@ checked: true
 ---
 # Helpers
 
-Helpers are methods and libraries used to format report output when [implementing a reporter](README.md#implementing-the-reporter). TestCafe mixes in these methods to the reporter.
+Helpers are methods and libraries used to format report output when [implementing a reporter](README.md#implementing-the-reporter). TestCafe mixes these methods into the reporter.
 
 To access helpers, use `this`.
 
@@ -221,7 +221,7 @@ Parameter   | Type   | Description
 
 **Example**
 
-The following example demonstrates how to escape the fixture name *Tests for the "Example" page* for HTML.
+The following example demonstrates how to encode the fixture name *Tests for the "Example" page* for HTML
 
 ```js
 async reportFixtureStart (name, path, meta) {

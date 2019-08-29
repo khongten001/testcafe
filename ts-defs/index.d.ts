@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // Utility
 type ElementOf<T> = T extends (infer E)[] ? E : never;
 type Extend<T, E> = T extends E ? E : never;
@@ -875,12 +876,12 @@ interface RequestLogger {
      * Returns whether the logger contains a request that matches the predicate.
      * @param predicate - The predicate
      */
-    contains(predicate: Function): Promise<boolean>;
+    contains(predicate: (request: LoggedRequest) => boolean): Promise<boolean>;
     /**
      * Returns the number of requests that match the predicate.
      * @param predicate - The predicate
      */
-    count(predicate: Function): Promise<number>;
+    count(predicate: (request: LoggedRequest) => boolean): Promise<number>;
     /**
      * Clears all logged requests.
      */
@@ -888,7 +889,7 @@ interface RequestLogger {
     /**
      * Returns an array of logged requests.
      */
-    requests: Array<Request>;
+    requests: Array<LoggedRequest>;
 }
 
 interface RequestLoggerOptions {
@@ -933,7 +934,7 @@ interface RequestMock {
     respond(body?: object | string | ((req: any, res: any) => any), statusCode?: number, headers?: object): RequestMock;
 }
 
-interface Request {
+interface LoggedRequest {
     /**
      * The user agent that sent the request.
      */
@@ -972,7 +973,7 @@ interface ResponseData {
     /**
      * The status code received in the response.
      */
-    statusCode: string;
+    statusCode: number;
     /**
      * Response headers in the property-value form. Logged if the `logResponseHeaders` option is set to true.
      */
@@ -1548,12 +1549,19 @@ interface Assertion<E = any> {
 
 }
 
+// Custom Client Scripts
+interface ClientScript {
+    content?: string;
+    path?: string;
+    page?: any;
+}
+
 interface TestCafe {
     /**
      * Creates the test runner that is used to configure and launch test tasks.
      */
     createRunner(): Runner;
-    
+
     /**
      * Creates the live mode test runner that is used to configure and launch test tasks.
      */
@@ -1665,6 +1673,13 @@ interface Runner {
      * @param bypassRules - A set of rules that specify which resources are accessed bypassing the proxy.
      */
     useProxy(host: string, bypassRules?: string | string[]): this;
+
+    /**
+     * Injects scripts into pages visited during the test execution.
+     *
+     * @param scripts - Scripts that should be added to the tested pages.
+    */
+    clientScripts (scripts: ClientScript | ClientScript[]): this;
 
     /**
      * Runs tests according to the current configuration. Returns the number of failed tests.
@@ -1860,15 +1875,17 @@ interface FixtureFn {
      * Declares a test fixture.
      *
      * @param name - The name of the fixture.
+     * @param tagArgs - tag function arguments required to support the "fixture`${x}`" syntax
      */
-    (name: string | TemplateStringsArray): this;
+    (name: string | TemplateStringsArray, ...tagArgs: any[]): this;
     /**
      * Specifies a webpage at which all tests in a fixture start.
      *
      * @param url - The URL of the webpage where tests start.
+     * @param tagArgs - tag function arguments required to support the "fixture.page`${x}`" syntax
      * To test webpages in local directories, you can use the `file://` scheme or relative paths.
      */
-    page(url: string | TemplateStringsArray): this;
+    page(url: string | TemplateStringsArray, ...tagArgs: any[]): this;
     /**
      * Specifies HTTP Basic or Windows (NTLM) authentication credentials for all tests in the fixture.
      *

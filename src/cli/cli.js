@@ -7,10 +7,14 @@ import log from './log';
 import remotesWizard from './remotes-wizard';
 import correctBrowsersAndSources from './correct-browsers-and-sources';
 import createTestCafe from '../';
+import * as marketing from '../marketing';
+import isCI from 'is-ci';
 
 // NOTE: Load the provider pool lazily to reduce startup time
 const lazyRequire         = require('import-lazy')(require);
 const browserProviderPool = lazyRequire('../browser/provider/pool');
+
+const NOT_PARSABLE_REPORTERS = ['spec', 'list', 'minimal'];
 
 let showMessageOnExit = true;
 let exitMessageShown  = false;
@@ -61,6 +65,15 @@ function error (err) {
     exit(1);
 }
 
+function shouldShowMarketingMessage (reporterPlugings) {
+    if (isCI)
+        return false;
+
+    const stdoutReporterPlugin = reporterPlugings.find(plugin => plugin.outStream === process.stdout || !plugin.outStream);
+
+    return stdoutReporterPlugin && NOT_PARSABLE_REPORTERS.includes(stdoutReporterPlugin.plugin.name);
+}
+
 async function runTests (argParser) {
     const opts              = argParser.opts;
     const port1             = opts.ports && opts.ports[0];
@@ -82,24 +95,28 @@ async function runTests (argParser) {
 
     let failed = 0;
 
-
     runner.isCli = true;
 
     runner
         .useProxy(proxy, proxyBypass)
         .src(sources)
+        .tsConfigPath(argParser.opts.tsConfigPath)
         .browsers(browsers)
         .reporter(argParser.opts.reporter)
         .concurrency(argParser.opts.concurrency)
         .filter(argParser.filter)
         .video(opts.video, opts.videoOptions, opts.videoEncodingOptions)
         .screenshots(opts.screenshots, opts.screenshotsOnFails, opts.screenshotPathPattern)
-        .startApp(opts.app, opts.appInitDelay);
+        .startApp(opts.app, opts.appInitDelay)
+        .clientScripts(argParser.opts.clientScripts);
 
     runner.once('done-bootstrapping', () => log.hideSpinner());
 
     try {
         failed = await runner.run(opts);
+
+        if (shouldShowMarketingMessage(runner.reporterPlugings))
+            await marketing.showMessageWithLinkToTestCafeStudio();
     }
 
     finally {

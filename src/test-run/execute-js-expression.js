@@ -1,63 +1,72 @@
-import { createContext, runInContext } from 'vm';
-import SelectorBuilder from '../client-functions/selectors/selector-builder';
-import ClientFunctionBuilder from '../client-functions/client-function-builder';
+import { runInContext } from 'vm';
+import { ExecuteAsyncExpressionError } from '../errors/test-run';
+import { setContextOptions } from '../api/test-controller/execution-context';
 
-const contextsInfo = [];
+const ERROR_LINE_COLUMN_REGEXP = /:(\d+):(\d+)/;
+const ERROR_LINE_OFFSET        = -1;
+const ERROR_COLUMN_OFFSET      = -4;
 
-function getContextInfo (testRun) {
-    let contextInfo = contextsInfo.find(info => info.testRun === testRun);
-
-    if (!contextInfo) {
-        contextInfo = { testRun, context: createExecutionContext(testRun), options: {} };
-
-        contextsInfo.push(contextInfo);
-    }
-
-    return contextInfo;
+// NOTE: do not beautify this code since offsets for error lines and columns are coded here
+function wrapInAsync (expression) {
+    return '(async function() {\n' +
+           expression + ';\n' +
+           '});';
 }
 
-function getContext (testRun, options = {}) {
-    const contextInfo = getContextInfo(testRun);
+function getErrorLineColumn (err) {
+    const result = err.stack.match(ERROR_LINE_COLUMN_REGEXP);
 
-    contextInfo.options = options;
+    const line   = parseInt(result[1], 10);
+    const column = parseInt(result[2], 10);
 
-    return contextInfo.context;
+    return { line, column };
 }
 
-function createExecutionContext (testRun) {
-    const sandbox = {
-        Selector: (fn, options = {}) => {
-            const { skipVisibilityCheck, collectionMode } = getContextInfo(testRun).options;
+function formatExpression (expression) {
+    const expresionMessage = expression.split('\n');
 
-            if (skipVisibilityCheck)
-                options.visibilityCheck = false;
+    return '[JS code]\n' + expresionMessage.map(str => {
+        return ' '.repeat(10) + str;
+    }).join('\n');
+}
 
-            if (testRun && testRun.id)
-                options.boundTestRun = testRun;
-
-            if (collectionMode)
-                options.collectionMode = collectionMode;
-
-            const builder = new SelectorBuilder(fn, options, { instantiation: 'Selector' });
-
-            return builder.getFunction();
-        },
-
-        ClientFunction: (fn, options = {}) => {
-            if (testRun && testRun.id)
-                options.boundTestRun = testRun;
-
-            const builder = new ClientFunctionBuilder(fn, options, { instantiation: 'ClientFunction' });
-
-            return builder.getFunction();
-        }
+function createErrorFormattingOptions (expression) {
+    return {
+        filename:     formatExpression(expression),
+        lineOffset:   ERROR_LINE_OFFSET,
+        columnOffset: ERROR_COLUMN_OFFSET
     };
-
-    return createContext(sandbox);
 }
 
-export default function (expression, testRun, options) {
-    const context = getContext(testRun, options);
+function getExecutionContext (testController, options = {}) {
+    const context = testController.getExecutionContext();
 
-    return runInContext(expression, context, { displayErrors: false });
+    // TODO: Find a way to avoid this assignment
+    setContextOptions(context, options);
+
+    return context;
+}
+
+export function executeJsExpression (expression, testRun, options) {
+    const context      = getExecutionContext(testRun.controller, options);
+    const errorOptions = createErrorFormattingOptions(expression);
+
+    return runInContext(expression, context, errorOptions);
+}
+
+export async function executeAsyncJsExpression (expression, testRun, callsite) {
+    const context      = getExecutionContext(testRun.controller);
+    const errorOptions = createErrorFormattingOptions(expression);
+
+    try {
+        return await runInContext(wrapInAsync(expression), context, errorOptions)();
+    }
+    catch (err) {
+        if (err.isTestCafeError)
+            throw err;
+
+        const { line, column } = getErrorLineColumn(err);
+
+        throw new ExecuteAsyncExpressionError(err, expression, line, column, callsite);
+    }
 }
